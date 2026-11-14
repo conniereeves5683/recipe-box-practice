@@ -8,6 +8,8 @@ That is the point: you will add both, lesson by lesson, in Units 2 and 3.
 import sqlite3
 
 from flask import Flask, g, jsonify, request
+from werkzeug.security import generate_password_hash
+from sqlite3 import IntegrityError
 
 DATABASE = "recipes.db"
 
@@ -85,6 +87,46 @@ def create_recipe():
     ).fetchone()
     return jsonify(recipe_to_dict(row)), 201
 
+@app.route("/register", methods=["POST"])
+def register():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    username = data.get("username")
+    email = data.get("email")
+    password = data.get("password")
+
+    if not isinstance(username, str) or not username.strip():
+        return jsonify({"error": "Username is required"}), 400
+
+    if not isinstance(email, str) or not email.strip():
+        return jsonify({"error": "Email is required"}), 400
+
+    if not isinstance(password, str) or not password.strip():
+        return jsonify({"error": "Password is required"}), 400
+
+    password_hash = generate_password_hash(password)
+
+    db = get_db()
+    cursor = db.cursor()
+
+    try:
+        cursor.execute(
+            "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+            (username, email, password_hash),
+        )
+        db.commit()
+    except IntegrityError as e:
+        print("REGISTER INTEGRITY ERROR:", repr(e))
+        # duplicate username or email
+        return jsonify({"error": "Username or email already exists"}), 409
+    except Exception as e:
+        print("REGISTER ERROR:", repr(e))
+        return jsonify({"error": "Could not create user"}), 500
+
+    return jsonify({"message": "User created"}), 201
 
 @app.patch("/recipes/<int:recipe_id>")
 def update_recipe(recipe_id):
@@ -129,4 +171,35 @@ def delete_recipe(recipe_id):
 
 
 if __name__ == "__main__":
+    app.run(debug=True)
+
+
+
+from security import hash_password, verify_password
+# from recipe-box-api import db, User  # adjust names to match your project
+
+
+
+def demo_user():
+    plain_password = "secret123"  # demo only
+    password_hash = hash_password(plain_password)
+
+    print("Hash to store:", password_hash)
+
+    # create or update a user
+    user = User(
+        username="hash_demo",
+        password_hash=password_hash
+    )
+    db.session.add(user)
+    db.session.commit()
+
+    # reload and verify
+    fetched = User.query.filter_by(username="hash_demo").first()
+    print("From DB password_hash:", fetched.password_hash)
+    print("Verify correct:", verify_password(fetched.password_hash, "secret123"))
+    print("Verify wrong:", verify_password(fetched.password_hash, "wrongpass"))
+
+if __name__ == "__main__":
+    demo_user()
     app.run(debug=True)
