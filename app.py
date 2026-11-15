@@ -8,7 +8,7 @@ That is the point: you will add both, lesson by lesson, in Units 2 and 3.
 import sqlite3
 
 from flask import Flask, g, jsonify, request
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 from sqlite3 import IntegrityError
 
 DATABASE = "recipes.db"
@@ -87,6 +87,7 @@ def create_recipe():
     ).fetchone()
     return jsonify(recipe_to_dict(row)), 201
 
+
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
@@ -127,6 +128,33 @@ def register():
         return jsonify({"error": "Could not create user"}), 500
 
     return jsonify({"message": "User created"}), 201
+
+@app.post("/login")
+def login():
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")  # we’ll use this soon
+
+    db = get_db()
+    cursor = db.execute(
+        "SELECT id, username, password_hash FROM users WHERE username = ?",
+        (username,),
+    )
+    user = cursor.fetchone()
+    if user is None:
+       return jsonify({"error": "Invalid username or password"}), 401
+
+    else:
+        stored_hash = user["password_hash"]
+        password_ok = check_password_hash(stored_hash, password)
+
+    if not password_ok:
+        return jsonify({"error": "Invalid username or password"}), 401
+
+    return jsonify({
+        "id":user["id"],
+        "username":user["username"],
+    }), 200
 
 @app.patch("/recipes/<int:recipe_id>")
 def update_recipe(recipe_id):
