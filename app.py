@@ -233,3 +233,5 @@ def demo_user():
 if __name__ == "__main__":
     demo_user()
     app.run(debug=True)
+
+#checked login/registration status codes after lesson 9 11/15/2026 3:01 pm
