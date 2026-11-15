@@ -142,8 +142,10 @@ def login():
     )
     user = cursor.fetchone()
     if user is None:
-       return jsonify({"error": "Invalid username or password"}), 401
+       return jsonify({"error": "Invalid username or password"}), 400
 
+    if password is None:
+        return jsonify({"error": "Invalid username or password"}), 400
     else:
         stored_hash = user["password_hash"]
         password_ok = check_password_hash(stored_hash, password)
