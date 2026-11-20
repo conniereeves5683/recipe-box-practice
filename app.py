@@ -5,16 +5,22 @@ and it trusts everyone. There is no authentication and no authorization yet.
 That is the point: you will add both, lesson by lesson, in Units 2 and 3.
 """
 
+import os
+import jwt
 import sqlite3
 
+from datetime import datetime, timedelta
 from flask import Flask, g, jsonify, request
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlite3 import IntegrityError
+from dotenv import load_dotenv
 
+load_dotenv()
+JWT_SECRET = os.getenv("JWT_SECRET")
+print("JWT_SECRET is:", repr(JWT_SECRET))
 DATABASE = "recipes.db"
 
 app = Flask(__name__)
-
 
 def get_db():
     if "db" not in g:
@@ -153,9 +159,22 @@ def login():
     if not password_ok:
         return jsonify({"error": "Invalid username or password"}), 401
 
+        # At this point, credentials are valid
+    user_id = user["id"]
+    username = user["username"]
+
+    payload = {
+        "sub": str(user_id),  # user id as a string
+        "username": username,
+        "exp": datetime.utcnow() + timedelta(hours=1),
+    }
+
+    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
     return jsonify({
-        "id":user["id"],
-        "username":user["username"],
+        "id": user_id,
+        "username": username,
+        "token": token,
     }), 200
 
 @app.patch("/recipes/<int:recipe_id>")
