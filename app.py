@@ -9,7 +9,7 @@ import os
 import jwt
 import sqlite3
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import Flask, g, jsonify, request
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlite3 import IntegrityError
@@ -34,8 +34,10 @@ def verify_token(token):
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
         return payload  # only if signature is valid
+    except jwt.ExpiredSignatureError:
+        return "expired"
     except jwt.PyJWTError:
-        return None
+        return "invalid"
     
 
 load_dotenv()
@@ -98,8 +100,10 @@ def create_recipe():
         return jsonify({"error": "authentication required"}), 401
 
     payload = verify_token(token)
-    if payload is None:
-        return jsonify({"error": "invalid or expired token"}), 401
+    if payload == "expired":
+        return jsonify({"error": "token expired, please log in again"}), 401
+    elif payload == "invalid":
+        return jsonify({"error": "invalid token"}), 401
     
     user_id = payload.get("sub")
     username = payload.get("username")
@@ -195,18 +199,21 @@ def login():
         return jsonify({"error": "Invalid username or password"}), 401
 
         # At this point, credentials are valid
+    exp = datetime.now(timezone.utc) + timedelta(seconds=30)
+        
     user_id = user["id"]
     username = user["username"]
 
     payload = {
-        "sub": str(user_id),  # user id as a string
-        "username": username,
-        "exp": datetime.utcnow() + timedelta(hours=1),
+    "sub": str(user_id),  # user id as a string
+    "username": username,
+    "exp": exp
     }
 
     token = jwt.encode(payload, JWT_SECRET, algorithm=ALGORITHM)
-
+    
     return jsonify({
+
         "id": user_id,
         "username": username,
         "token": token,
@@ -219,8 +226,10 @@ def update_recipe(recipe_id):
         return jsonify({"error": "authentication required"}), 401
 
     payload = verify_token(token)
-    if payload is None:
-        return jsonify({"error": "invalid or expired token"}), 401
+    if payload == "expired":
+        return jsonify({"error": "token expired, please log in again"}), 401
+    elif payload == "invalid":
+        return jsonify({"error": "invalid token"}), 401
 
     user_id = payload.get("sub")
     username = payload.get("username")
@@ -264,8 +273,10 @@ def delete_recipe(recipe_id):
         return jsonify({"error": "authentication required"}), 401
 
     payload = verify_token(token)
-    if payload is None:
-        return jsonify({"error": "invalid or expired token"}), 401
+    if payload == "expired":
+        return jsonify({"error": "token expired, please log in again"}), 401
+    elif payload == "invalid":
+        return jsonify({"error": "invalid token"}), 401
 
     user_id = payload.get("sub")
     username = payload.get("username")
